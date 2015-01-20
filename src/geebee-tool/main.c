@@ -19,6 +19,39 @@
 
 #include "../xbee.h"
 
+void cb_frame (GeebeeXbee *xbee, GeebeePacket *reply, gpointer data);
+
+void read_address(GeebeeXbee *xbee) {
+  GeebeeAtCommandRequest *req = geebee_at_command_request_new ("SH", NULL, 0);
+  req->packet.frame_id = 'A';
+
+  geebee_xbee_send_async (xbee, (GeebeePacket*)req, NULL, NULL, NULL);
+  geebee_packet_unref ((GeebeePacket*)req);
+}
+
+void remote_read_address(GeebeeXbee *xbee) {
+  GeebeeRemoteAtCommandRequest *req = geebee_remote_at_command_request_new (GEEBEE_BROADCAST_ADDR64, GEEBEE_BROADCAST_ADDR16, "SH", NULL, 0);
+  req->packet.frame_id = 'A';
+
+  geebee_xbee_send_async (xbee, (GeebeePacket*)req, NULL, NULL, NULL);
+  geebee_packet_unref ((GeebeePacket*)req);
+}
+
+int main(int argc, char** argv)
+{
+  GMainLoop *loop = NULL;
+  GError *error = NULL;
+  GeebeeXbee *xbee = NULL;
+  xbee = geebee_xbee_new ();
+  g_signal_connect (xbee, "new-frame", G_CALLBACK (cb_frame), NULL);
+
+  remote_read_address (xbee);
+  loop = g_main_loop_new (NULL, 0);
+  g_main_loop_run (loop);
+
+  return 0;
+}
+
 void
 cb_frame (GeebeeXbee *xbee, GeebeePacket *reply, gpointer data)
 {
@@ -37,25 +70,11 @@ cb_frame (GeebeeXbee *xbee, GeebeePacket *reply, gpointer data)
     case AtResponse:
       g_printf ("Got a response from AT%s.\n", ((GeebeeAtCommandResponse*)reply)->command);
       break;
+    case RemoteAtResponse:
+      g_printf ("Remote AT response.\n");
+      break;
+    default:
+      g_printf ("Some unknown packet :(\n");
   }
-}
-
-int main(int argc, char** argv)
-{
-  GMainLoop *loop = NULL;
-  GError *error = NULL;
-  GeebeeXbee *xbee = NULL;
-  GeebeeAtCommandRequest *req = geebee_at_command_request_new ("SH", NULL, 0);
-  req->packet.frame_id = 'A';
-
-  xbee = geebee_xbee_new ();
-  g_signal_connect (xbee, "new-frame", G_CALLBACK (cb_frame), NULL);
-  geebee_xbee_send_async (xbee, (GeebeePacket*)req, NULL, NULL, NULL);
-  geebee_packet_unref ((GeebeePacket*)req);
-
-  loop = g_main_loop_new (NULL, 0);
-  g_main_loop_run (loop);
-
-  return 0;
 }
 
