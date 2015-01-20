@@ -17,20 +17,31 @@
  * along with GeeBee. If not, see <http://www.gnu.org/licenses/>
  */
 
-#include <glib.h>
-
 #ifndef __GEEBEE_ADDRESS64_H__
 #define __GEEBEE_ADDRESS64_H__
 
+#include <glib.h>
+
 G_BEGIN_DECLS
 
-struct GeebeeAddress64 {
+typedef struct _GeebeeAddress64 {
   guint32 msb;
   guint32 lsb;
+} GeebeeAddress64;
+
+typedef struct _GeebeeAddress16 {
+  guint16 addr;
+} GeebeeAddress16;
+
+static const GeebeeAddress64 GEEBEE_BROADCAST_ADDR64 = {
+  .msb = 0,
+  .lsb = 0xffff
 };
 
-struct GeebeeAddress16 {
-  guint16 addr;
+static const GeebeeAddress16 GEEBEE_BROADCAST_ADDR16 = {
+  .addr = 0xfffe
 };
+
+G_END_DECLS
 
 #endif // __GEEBEE_ADDRESS64_H__
