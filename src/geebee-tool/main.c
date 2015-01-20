@@ -30,7 +30,7 @@ void read_address(GeebeeXbee *xbee) {
 }
 
 void remote_read_address(GeebeeXbee *xbee) {
-  GeebeeRemoteAtCommandRequest *req = geebee_remote_at_command_request_new (GEEBEE_BROADCAST_ADDR64, GEEBEE_BROADCAST_ADDR16, "SH", NULL, 0);
+  GeebeeRemoteAtCommandRequest *req = geebee_remote_at_command_request_new (GEEBEE_BROADCAST_ADDR64, GEEBEE_BROADCAST_ADDR16, "SL", NULL, 0);
   req->packet.frame_id = 'A';
 
   geebee_xbee_send_async (xbee, (GeebeePacket*)req, NULL, NULL, NULL);
@@ -71,7 +71,7 @@ cb_frame (GeebeeXbee *xbee, GeebeePacket *reply, gpointer data)
       g_printf ("Got a response from AT%s.\n", ((GeebeeAtCommandResponse*)reply)->command);
       break;
     case RemoteAtResponse:
-      g_printf ("Remote AT response.\n");
+      g_printf ("Remote AT response: %X %X\n", ((GeebeeRemoteAtResponse*) reply)->address64.msb, ((GeebeeRemoteAtResponse*) reply)->address64.lsb);
       break;
     default:
       g_printf ("Some unknown packet :(\n");

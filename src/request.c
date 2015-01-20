@@ -69,63 +69,69 @@ build_at_packet (GeebeeAtCommandRequest *pkt, gchar *buf)
   return 4 + pkt->value_length;
 }
 
-static void
+static gsize
 read_addr64 (GeebeeAddress64 *addr, gchar *buf)
 {
   gsize i = 0;
   guint32 bits = 0;
   for (i; i < sizeof (bits); i++) {
-    bits = buf[i] & 0xff;
+    bits |= buf[i] & 0xff;
     bits = bits << 8;
   }
+  bits |= buf[i] & 0xff;
   addr->msb = bits;
-  for (i; i < sizeof (bits); i++) {
-    bits = buf[i] & 0xff;
+  bits = 0;
+  for (i; i < sizeof (bits) * 2; i++) {
+    bits |= buf[i] & 0xff;
     bits = bits << 8;
   }
+  bits |= buf[i] & 0xff;
   addr->lsb = bits;
+  return i;
 }
 
 static gsize
 write_addr64 (GeebeeAddress64 *addr, gchar *buf)
 {
-  gsize i = 0;
-  guint32 bits = addr->msb;
+  gssize i = 0;
+  guint32 bits = __bswap_32 (addr->msb);
   for (i; i < sizeof (bits); i++) {
     buf[i] = bits & 0xff;
     bits = bits >> 8;
   }
-  bits = addr->lsb;
-  for (i; i < sizeof (bits); i++) {
+  bits = __bswap_32 (addr->lsb);
+  for (i; i < sizeof (bits) * 2; i++) {
     buf[i] = bits & 0xff;
     bits = bits >> 8;
   }
 
-  return i;
+  return i + 1;
 }
 
-static void
+static gsize
 read_addr16 (GeebeeAddress16 *addr, gchar *buf)
 {
   gsize i = 0;
   guint16 bits = 0;
   for (i; i < sizeof (bits); i++) {
-    bits = buf[i] & 0xff;
+    bits |= buf[i] & 0xff;
     bits = bits << 8;
   }
+  bits |= buf[i] & 0xff;
   addr->addr = bits;
+  return i;
 }
 
 static gsize
 write_addr16 (GeebeeAddress16 *addr, gchar *buf)
 {
-  gsize i = 0;
-  guint16 bits = addr->addr;
+  gssize i = 0;
+  guint16 bits = __bswap_16 (addr->addr);
   for (i; i < sizeof (bits); i++) {
     buf[i] = bits & 0xff;
     bits = bits >> 8;
   }
-  return i;
+  return i + 1;
 }
 
 static gsize
@@ -135,8 +141,8 @@ build_remote_at_packet (GeebeeRemoteAtCommandRequest *pkt, gchar *buf)
   int s = 0;
   buf[s++] = RemoteAtRequest;
   buf[s++] = pkt->packet.frame_id;
-  s += write_addr64 (&pkt->address64, &buf[s]);
-  s += write_addr16 (&pkt->address16, &buf[s]);
+  s += write_addr64 (&pkt->address64, &buf[s]) - 1;
+  s += write_addr16 (&pkt->address16, &buf[s]) - 1;
   buf[s++] = 0;
   buf[s++] = pkt->command[0];
   buf[s++] = pkt->command[1];
@@ -212,24 +218,37 @@ parse_status_packet (guchar *buf, gsize bufsize)
   return (GeebeePacket*)geebee_modem_status_response_new (buf[1]);
 }
 
+static int
+min(int a, int b)
+{
+  return (a < b) ? a : b;
+}
+
 GeebeePacket*
 parse_remote_at_packet (guchar *buf, gsize bufsize)
 {
   g_assert_cmphex (buf[0], ==, RemoteAtResponse);
-  guint idx = 0;
+  GeebeeRemoteAtResponse *resp;
+  guint idx = 1;
   GeebeeAddress64 addr64;
   GeebeeAddress16 addr16;
   char command[2];
+  char param[4];
+  memset (&param[0], 0, sizeof (param));
   GeebeeRemoteAtStatus status;
 
-  read_addr64 (&addr64, &buf[idx]);
-  idx += sizeof (addr64);
-  read_addr16 (&addr16, &buf[idx]);
-  idx += sizeof (addr16);
+  idx += read_addr64 (&addr64, &buf[idx]);
+  idx += read_addr16 (&addr16, &buf[idx]);
   memcpy (&command[0], &buf[idx], sizeof (command));
   idx += sizeof (command);
   status = buf[idx];
-  return (GeebeePacket*)geebee_remote_at_response_new (addr64, addr16, command, status, NULL);
+  idx++;
+  if (idx < bufsize) {
+    memcpy (&param[0], &buf[idx], min (sizeof (param), bufsize - idx));
+  }
+  resp = geebee_remote_at_response_new (addr64, addr16, command, status, param);
+  resp->packet.frame_id = buf[1];
+  return (GeebeePacket*)resp;
 }
 
 guchar
@@ -276,7 +295,7 @@ geebee_remote_at_response_new (GeebeeAddress64 src64, GeebeeAddress16 src16, con
   resp->command[0] = cmd[0];
   resp->command[1] = cmd[1];
   resp->status = status;
-  //memcpy (&resp->data, param, sizeof (resp->data));
+  memcpy (&resp->data[0], param, sizeof (resp->data));
   return resp;
 }
 
