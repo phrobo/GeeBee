@@ -17,10 +17,12 @@
  * along with GeeBee. If not, see <http://www.gnu.org/licenses/>
  */
 
-#include <glib.h>
-
 #ifndef __GEEBEE_REQUEST_H__
 #define __GEEBEE_REQUEST_H__
+
+#include "address64.h"
+
+#include <glib.h>
 
 G_BEGIN_DECLS
 
@@ -28,6 +30,8 @@ typedef enum _GeebeeApiId {
   AtRequest = 0x08,
   AtResponse = 0x88,
   ModemStatus = 0x8a,
+  RemoteAtRequest = 0x17,
+  RemoteAtResponse = 0x97
 } GeebeeApiId;
 
 typedef struct _GeebeePacket {
@@ -73,6 +77,33 @@ typedef struct _GeebeeModemStatusResponse {
   GeebeeModemStatus status;
 } GeebeeModemStatusResponse;
 
+typedef struct _GeebeeRemoteAtCommandRequest {
+  GeebeePacket packet;
+  GeebeeAddress64 address64;
+  GeebeeAddress16 address16;
+  unsigned char options;
+  char command[2];
+  char data[72];
+  unsigned char dataLength;
+} GeebeeRemoteAtCommandRequest;
+
+typedef enum _GeebeeRemoteAtStatus {
+  RemoteAtOk = 0,
+  RemoteAtError = 1,
+  RemoteAtInvalidCommand = 2,
+  RemoteAtInvalidParameter = 3,
+  RemoteAtTxFailed = 4
+} GeebeeRemoteAtStatus;
+
+typedef struct _GeebeeRemoteAtResponse {
+  GeebeePacket packet;
+  GeebeeAddress64 address64;
+  GeebeeAddress16 address16;
+  char command[2];
+  GeebeeRemoteAtStatus status;
+  char data[4];
+} GeebeeRemoteAtResponse;
+
 gsize geebee_packet_build (GeebeePacket *pkt, gchar *buf);
 void geebee_packet_unref (GeebeePacket *pkt);
 GeebeePacket *geebee_packet_ref (GeebeePacket *pkt); 
@@ -82,6 +113,8 @@ guchar geebee_packet_checksum (gchar *buf, gsize length);
 GeebeeAtCommandRequest *geebee_at_command_request_new (const gchar *cmd, const gchar *param, gsize param_length);
 GeebeeAtCommandResponse *geebee_at_command_response_new (const gchar *cmd, guchar status, gchar *param, gsize param_length);
 GeebeeModemStatusResponse *geebee_modem_status_response_new (GeebeeModemStatus status);
+GeebeeRemoteAtCommandRequest *geebee_remote_at_command_request_new (GeebeeAddress64 dst64, GeebeeAddress16 dst16, const gchar *cmd, const gchar *param, gsize param_length);
+GeebeeRemoteAtResponse *geebee_remote_at_response_new (GeebeeAddress64 src64, GeebeeAddress16 src16, const gchar *cmd, guchar status, const gchar *param);
 
 G_END_DECLS
 
